@@ -12,8 +12,9 @@ try {
 	console.warn("Failed to load environment variables:", e)
 }
 
-import { CloudService } from "@roo-code/cloud"
-import { TelemetryService, PostHogTelemetryClient } from "@roo-code/telemetry"
+// REMOVED: Cloud and telemetry imports for intranet security
+// import { CloudService } from "@roo-code/cloud"
+// import { TelemetryService, PostHogTelemetryClient } from "@roo-code/telemetry"
 
 import "./utils/path" // Necessary to have access to String.prototype.toPosix.
 
@@ -59,19 +60,11 @@ export async function activate(context: vscode.ExtensionContext) {
 	// Migrate old settings to new
 	await migrateSettings(context, outputChannel)
 
-	// Initialize telemetry service.
-	const telemetryService = TelemetryService.createInstance()
+	// REMOVED: Telemetry service initialization for intranet security
+	// No external analytics or telemetry data collection allowed
 
-	try {
-		telemetryService.register(new PostHogTelemetryClient())
-	} catch (error) {
-		console.warn("Failed to register PostHogTelemetryClient:", error)
-	}
-
-	// Initialize Roo Code Cloud service.
-	await CloudService.createInstance(context, {
-		stateChanged: () => ClineProvider.getVisibleInstance()?.postStateToWebview(),
-	})
+	// REMOVED: Roo Code Cloud service initialization for intranet security
+	// No external cloud service connections allowed
 
 	// Initialize i18n for internationalization support
 	initializeI18n(context.globalState.get("language") ?? formatLanguage(vscode.env.language))
@@ -99,7 +92,8 @@ export async function activate(context: vscode.ExtensionContext) {
 	}
 
 	const provider = new ClineProvider(context, outputChannel, "sidebar", contextProxy, codeIndexManager)
-	TelemetryService.instance.setProvider(provider)
+	// REMOVED: Telemetry provider registration for intranet security
+	// TelemetryService.instance.setProvider(provider)
 
 	if (codeIndexManager) {
 		context.subscriptions.push(codeIndexManager)
@@ -165,8 +159,9 @@ export async function activate(context: vscode.ExtensionContext) {
 		const watchPaths = [
 			{ path: context.extensionPath, name: "extension" },
 			{ path: path.join(context.extensionPath, "../packages/types"), name: "types" },
-			{ path: path.join(context.extensionPath, "../packages/telemetry"), name: "telemetry" },
-			{ path: path.join(context.extensionPath, "../packages/cloud"), name: "cloud" },
+			// REMOVED: telemetry and cloud packages from development watching
+			// { path: path.join(context.extensionPath, "../packages/telemetry"), name: "telemetry" },
+			// { path: path.join(context.extensionPath, "../packages/cloud"), name: "cloud" },
 		]
 
 		console.log(
@@ -192,6 +187,7 @@ export async function activate(context: vscode.ExtensionContext) {
 export async function deactivate() {
 	outputChannel.appendLine(`${Package.name} extension deactivated`)
 	await McpServerManager.cleanup(extensionContext)
-	TelemetryService.instance.shutdown()
+	// REMOVED: Telemetry shutdown for intranet security
+	// TelemetryService.instance.shutdown()
 	TerminalRegistry.cleanup()
 }
