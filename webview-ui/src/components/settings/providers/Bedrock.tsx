@@ -73,18 +73,6 @@ export const Bedrock = ({
 					</SelectContent>
 				</Select>
 			</div>
-
-			{/* Custom ARN */}
-			<VSCodeTextField
-				value={apiConfiguration?.awsBedrockEndpoint || ""}
-				onInput={handleInputChange("awsBedrockEndpoint")}
-				placeholder="arn:aws:bedrock:region:account:inference-profile/inference-profile-id"
-				className="w-full">
-				<label className="block font-medium mb-1">Custom ARN</label>
-			</VSCodeTextField>
-			<div className="text-sm text-vscode-descriptionForeground mt-1">
-				Enter a custom ARN for specific Bedrock inference profiles or endpoints.
-			</div>
 		</>
 	)
 }

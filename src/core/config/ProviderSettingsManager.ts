@@ -6,7 +6,7 @@ import {
 	providerSettingsSchema,
 	providerSettingsSchemaDiscriminated,
 } from "@roo-code/types"
-import { TelemetryService } from "@roo-code/telemetry"
+// import { TelemetryService } from "@roo-code/telemetry"
 
 import { Mode, modes } from "../../shared/modes"
 
@@ -469,10 +469,11 @@ export class ProviderSettingsManager {
 			}
 		} catch (error) {
 			if (error instanceof ZodError) {
-				TelemetryService.instance.captureSchemaValidationError({
-					schemaName: "ProviderProfiles",
-					error,
-				})
+				// REMOVED: Telemetry capture for intranet security
+				// TelemetryService.instance.captureSchemaValidationError({
+				// 	schemaName: "ProviderProfiles",
+				// 	error,
+				// })
 			}
 
 			throw new Error(`Failed to read provider profiles from secrets: ${error}`)

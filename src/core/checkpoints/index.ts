@@ -1,7 +1,8 @@
 import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
 
-import { TelemetryService } from "@roo-code/telemetry"
+// REMOVED: TelemetryService import for intranet security
+// import { TelemetryService } from "@roo-code/telemetry"
 
 import { Task } from "../task/Task"
 
@@ -167,7 +168,8 @@ export async function checkpointSave(cline: Task, force = false) {
 		return
 	}
 
-	TelemetryService.instance.captureCheckpointCreated(cline.taskId)
+	// REMOVED: Telemetry capture for intranet security
+	// TelemetryService.instance.captureCheckpointCreated(cline.taskId)
 
 	// Start the checkpoint process in the background.
 	return service.saveCheckpoint(`Task: ${cline.taskId}, Time: ${Date.now()}`, { allowEmpty: force }).catch((err) => {
@@ -199,7 +201,8 @@ export async function checkpointRestore(cline: Task, { ts, commitHash, mode }: C
 
 	try {
 		await service.restoreCheckpoint(commitHash)
-		TelemetryService.instance.captureCheckpointRestored(cline.taskId)
+		// REMOVED: Telemetry capture for intranet security
+		// TelemetryService.instance.captureCheckpointRestored(cline.taskId)
 		await provider?.postMessageToWebview({ type: "currentCheckpointUpdated", text: commitHash })
 
 		if (mode === "restore") {
@@ -257,7 +260,8 @@ export async function checkpointDiff(cline: Task, { ts, previousCommitHash, comm
 		return
 	}
 
-	TelemetryService.instance.captureCheckpointDiffed(cline.taskId)
+	// REMOVED: Telemetry capture for intranet security
+	// TelemetryService.instance.captureCheckpointDiffed(cline.taskId)
 
 	if (!previousCommitHash && mode === "checkpoint") {
 		const previousCheckpoint = cline.clineMessages

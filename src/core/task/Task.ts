@@ -21,7 +21,6 @@ import {
 	type HistoryItem,
 	TelemetryEventName,
 } from "@roo-code/types"
-import { TelemetryService } from "@roo-code/telemetry"
 import { CloudService } from "@roo-code/cloud"
 
 // api
@@ -245,9 +244,11 @@ export class Task extends EventEmitter<ClineEvents> {
 		this.taskNumber = taskNumber
 
 		if (historyItem) {
-			TelemetryService.instance.captureTaskRestarted(this.taskId)
+			// REMOVED: Telemetry capture for intranet security
+			// TelemetryService.instance.captureTaskRestarted(this.taskId)
 		} else {
-			TelemetryService.instance.captureTaskCreated(this.taskId)
+			// REMOVED: Telemetry capture for intranet security
+			// TelemetryService.instance.captureTaskCreated(this.taskId)
 		}
 
 		this.diffStrategy = new MultiSearchReplaceDiffStrategy(this.fuzzyMatchThreshold)
@@ -1090,7 +1091,10 @@ export class Task extends EventEmitter<ClineEvents> {
 				await this.say("user_feedback", text, images)
 
 				// Track consecutive mistake errors in telemetry.
-				TelemetryService.instance.captureConsecutiveMistakeError(this.taskId)
+				if (this.consecutiveMistakeCount >= 3) {
+					// REMOVED: Telemetry capture for intranet security
+					// TelemetryService.instance.captureConsecutiveMistakeError(this.taskId)
+				}
 			}
 
 			this.consecutiveMistakeCount = 0
@@ -1149,7 +1153,8 @@ export class Task extends EventEmitter<ClineEvents> {
 		const finalUserContent = [...parsedUserContent, { type: "text" as const, text: environmentDetails }]
 
 		await this.addToApiConversationHistory({ role: "user", content: finalUserContent })
-		TelemetryService.instance.captureConversationMessage(this.taskId, "user")
+		// REMOVED: Telemetry capture for intranet security
+		// TelemetryService.instance.captureConversationMessage(this.taskId, "user")
 
 		// Since we sent off a placeholder api_req_started message to update the
 		// webview while waiting to actually start the API request (to load
@@ -1369,13 +1374,14 @@ export class Task extends EventEmitter<ClineEvents> {
 				cacheReadTokens > 0 ||
 				typeof totalCost !== "undefined"
 			) {
-				TelemetryService.instance.captureLlmCompletion(this.taskId, {
-					inputTokens,
-					outputTokens,
-					cacheWriteTokens,
-					cacheReadTokens,
-					cost: totalCost,
-				})
+				// REMOVED: Telemetry capture for intranet security
+				// TelemetryService.instance.captureLlmCompletion(this.taskId, {
+				// 	inputTokens,
+				// 	outputTokens,
+				// 	cacheWriteTokens,
+				// 	cacheReadTokens,
+				// 	cost: totalCost,
+				// })
 			}
 
 			// Need to call here in case the stream was aborted.
@@ -1423,7 +1429,8 @@ export class Task extends EventEmitter<ClineEvents> {
 					content: [{ type: "text", text: assistantMessage }],
 				})
 
-				TelemetryService.instance.captureConversationMessage(this.taskId, "assistant")
+				// REMOVED: Telemetry capture for intranet security
+				// TelemetryService.instance.captureConversationMessage(this.taskId, "assistant")
 
 				// NOTE: This comment is here for future reference - this was a
 				// workaround for `userMessageContent` not getting set to true.
