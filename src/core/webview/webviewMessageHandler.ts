@@ -3,9 +3,10 @@ import fs from "fs/promises"
 import pWaitFor from "p-wait-for"
 import * as vscode from "vscode"
 
-import { type Language, type ProviderSettings, type GlobalState, TelemetryEventName } from "@roo-code/types"
-import { CloudService } from "@roo-code/cloud"
-import { TelemetryService } from "@roo-code/telemetry"
+import { type Language, type ProviderSettings, type GlobalState } from "@roo-code/types"
+// REMOVED: Cloud and telemetry imports for intranet security
+// import { CloudService } from "@roo-code/cloud"
+// import { TelemetryService } from "@roo-code/telemetry"
 
 import { ClineProvider } from "./ClineProvider"
 import { changeLanguage, t } from "../../i18n"
@@ -27,10 +28,11 @@ import { playTts, setTtsEnabled, setTtsSpeed, stopTts } from "../../utils/tts"
 import { singleCompletionHandler } from "../../utils/single-completion-handler"
 import { searchCommits } from "../../utils/git"
 import { exportSettings, importSettings } from "../config/importExport"
-import { getOpenAiModels } from "../../api/providers/openai"
-import { getOllamaModels } from "../../api/providers/ollama"
-import { getVsCodeLmModels } from "../../api/providers/vscode-lm"
-import { getLmStudioModels } from "../../api/providers/lm-studio"
+// REMOVED: Other AI provider imports for intranet security - only AWS Bedrock allowed
+// import { getOpenAiModels } from "../../api/providers/openai"
+// import { getOllamaModels } from "../../api/providers/ollama"
+// import { getVsCodeLmModels } from "../../api/providers/vscode-lm"
+// import { getLmStudioModels } from "../../api/providers/lm-studio"
 import { openMention } from "../mentions"
 import { TelemetrySetting } from "../../shared/TelemetrySetting"
 import { getWorkspacePath } from "../../utils/path"
@@ -118,7 +120,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			provider.getStateToPostToWebview().then((state) => {
 				const { telemetrySetting } = state
 				const isOptedIn = telemetrySetting === "enabled"
-				TelemetryService.instance.updateTelemetryState(isOptedIn)
+				// TelemetryService.instance.updateTelemetryState(isOptedIn)
 			})
 
 			provider.isViewLaunched = true
@@ -367,33 +369,6 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 				type: "routerModels",
 				routerModels: fetchedRouterModels as Record<RouterName, ModelRecord>,
 			})
-			break
-		case "requestOpenAiModels":
-			if (message?.values?.baseUrl && message?.values?.apiKey) {
-				const openAiModels = await getOpenAiModels(
-					message?.values?.baseUrl,
-					message?.values?.apiKey,
-					message?.values?.openAiHeaders,
-				)
-
-				provider.postMessageToWebview({ type: "openAiModels", openAiModels })
-			}
-
-			break
-		case "requestOllamaModels":
-			const ollamaModels = await getOllamaModels(message.text)
-			// TODO: Cache like we do for OpenRouter, etc?
-			provider.postMessageToWebview({ type: "ollamaModels", ollamaModels })
-			break
-		case "requestLmStudioModels":
-			const lmStudioModels = await getLmStudioModels(message.text)
-			// TODO: Cache like we do for OpenRouter, etc?
-			provider.postMessageToWebview({ type: "lmStudioModels", lmStudioModels })
-			break
-		case "requestVsCodeLmModels":
-			const vsCodeLmModels = await getVsCodeLmModels()
-			// TODO: Cache like we do for OpenRouter, etc?
-			provider.postMessageToWebview({ type: "vsCodeLmModels", vsCodeLmModels })
 			break
 		case "openImage":
 			openImage(message.text!)
@@ -1025,7 +1000,7 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 
 					// Capture telemetry for prompt enhancement.
 					const currentCline = provider.getCurrentCline()
-					TelemetryService.instance.capturePromptEnhanced(currentCline?.taskId)
+					// TelemetryService.instance.capturePromptEnhanced(currentCline?.taskId)
 
 					await provider.postMessageToWebview({ type: "enhancedPrompt", text: enhancedPrompt })
 				} catch (error) {
@@ -1326,39 +1301,8 @@ export const webviewMessageHandler = async (provider: ClineProvider, message: We
 			break
 
 		case "telemetrySetting": {
-			const telemetrySetting = message.text as TelemetrySetting
-			await updateGlobalState("telemetrySetting", telemetrySetting)
-			const isOptedIn = telemetrySetting === "enabled"
-			TelemetryService.instance.updateTelemetryState(isOptedIn)
-			await provider.postStateToWebview()
-			break
-		}
-		case "accountButtonClicked": {
-			// Navigate to the account tab.
-			provider.postMessageToWebview({ type: "action", action: "accountButtonClicked" })
-			break
-		}
-		case "rooCloudSignIn": {
-			try {
-				TelemetryService.instance.captureEvent(TelemetryEventName.AUTHENTICATION_INITIATED)
-				await CloudService.instance.login()
-			} catch (error) {
-				provider.log(`AuthService#login failed: ${error}`)
-				vscode.window.showErrorMessage("Sign in failed.")
-			}
-
-			break
-		}
-		case "rooCloudSignOut": {
-			try {
-				await CloudService.instance.logout()
-				await provider.postStateToWebview()
-				provider.postMessageToWebview({ type: "authenticatedUser", userInfo: undefined })
-			} catch (error) {
-				provider.log(`AuthService#logout failed: ${error}`)
-				vscode.window.showErrorMessage("Sign out failed.")
-			}
-
+			// REMOVED: Telemetry setting handling for intranet security
+			// No telemetry data collection allowed
 			break
 		}
 		case "codebaseIndexConfig": {
