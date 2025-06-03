@@ -176,9 +176,16 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 		if (this.options.awsUseProfile && this.options.awsProfile) {
 			// Use profile-based credentials if enabled and profile is set
+			// FIX: Create credential provider with separate client config to prevent HTTP/2 handler sharing
 			clientConfig.credentials = fromIni({
 				profile: this.options.awsProfile,
 				ignoreCache: true,
+				// Provide separate clientConfig for credential provider to prevent HTTP/2 handler sharing
+				// This fixes ERR_HTTP2_STREAM_CANCEL errors with AWS SDK v3
+				clientConfig: {
+					region: this.options.awsRegion,
+					// Don't share the HTTP/2 handler with credential providers
+				},
 			})
 		} else if (this.options.awsAccessKey && this.options.awsSecretKey) {
 			// Use direct credentials if provided
