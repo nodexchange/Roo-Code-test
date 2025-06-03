@@ -318,9 +318,64 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 			console.log("[Bedrock Debug] Sending request to AWS Bedrock...")
 
-			const response = await this.client.send(command, {
-				abortSignal: controller.signal,
-			})
+			// Add a promise wrapper to track the request more granularly
+			let response: any
+			try {
+				console.log("[Bedrock Debug] About to call client.send() with AWS SDK...")
+
+				// Create a timeout promise to help debug hanging requests
+				const timeoutPromise = new Promise((_, reject) => {
+					setTimeout(() => {
+						reject(
+							new Error("DEBUG_TIMEOUT: Request took longer than 30 seconds - likely network/auth issue"),
+						)
+					}, 30000) // 30 second timeout for debugging
+				})
+
+				// Create the actual request promise
+				const requestPromise = this.client.send(command, {
+					abortSignal: controller.signal,
+				})
+
+				console.log("[Bedrock Debug] AWS SDK send() called, waiting for response...")
+
+				// Race between the request and timeout
+				response = await Promise.race([requestPromise, timeoutPromise])
+			} catch (raceError) {
+				// This will catch both AWS errors and our timeout
+				const responseTime = Date.now() - startTime
+				console.error("[Bedrock Debug] Request failed or timed out:", {
+					responseTime: `${responseTime}ms`,
+					error: raceError instanceof Error ? raceError.message : String(raceError),
+					errorType: raceError instanceof Error ? raceError.name : typeof raceError,
+					wasTimeout: raceError instanceof Error && raceError.message.includes("DEBUG_TIMEOUT"),
+				})
+
+				// If it's our debug timeout, try to get more info about the hanging request
+				if (raceError instanceof Error && raceError.message.includes("DEBUG_TIMEOUT")) {
+					console.error("[Bedrock Debug] Request is hanging - possible issues:", {
+						region: this.options.awsRegion,
+						customArn: this.options.awsCustomArn,
+						useProfile: this.options.awsUseProfile,
+						profile: this.options.awsProfile,
+						hasAccessKey: !!this.options.awsAccessKey,
+						hasSecretKey: !!this.options.awsSecretKey,
+						hasSessionToken: !!this.options.awsSessionToken,
+						endpointEnabled: this.options.awsBedrockEndpointEnabled,
+						endpoint: this.options.awsBedrockEndpoint,
+						possibleCauses: [
+							"Network connectivity blocked by corporate firewall/proxy",
+							"AWS credentials invalid or expired",
+							"Region not accessible from your network",
+							"Custom endpoint unreachable",
+							"HTTP/2 connection issues",
+						],
+					})
+				}
+
+				// Re-throw the original error
+				throw raceError
+			}
 
 			const responseTime = Date.now() - startTime
 			console.log("[Bedrock Debug] Received response from AWS Bedrock:", {
