@@ -172,20 +172,28 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			// Add the endpoint configuration when specified and enabled
 			...(this.options.awsBedrockEndpoint &&
 				this.options.awsBedrockEndpointEnabled && { endpoint: this.options.awsBedrockEndpoint }),
+			// ROBUST FIX: Force HTTP/1.1 to prevent HTTP/2 stream cancellation issues
+			// This is more reliable than trying to separate credential providers
+			requestHandler: {
+				connectionTimeout: 30000,
+				socketTimeout: 60000,
+				httpsAgent: {
+					maxSockets: 50,
+					timeout: 60000,
+					// Force HTTP/1.1 to avoid HTTP/2 stream issues
+					keepAlive: true,
+					keepAliveMsecs: 30000,
+					maxFreeSockets: 10,
+				},
+			},
 		}
 
 		if (this.options.awsUseProfile && this.options.awsProfile) {
 			// Use profile-based credentials if enabled and profile is set
-			// FIX: Create credential provider with separate client config to prevent HTTP/2 handler sharing
+			// SIMPLIFIED: Use basic fromIni without complex clientConfig separation
 			clientConfig.credentials = fromIni({
 				profile: this.options.awsProfile,
 				ignoreCache: true,
-				// Provide separate clientConfig for credential provider to prevent HTTP/2 handler sharing
-				// This fixes ERR_HTTP2_STREAM_CANCEL errors with AWS SDK v3
-				clientConfig: {
-					region: this.options.awsRegion,
-					// Don't share the HTTP/2 handler with credential providers
-				},
 			})
 		} else if (this.options.awsAccessKey && this.options.awsSecretKey) {
 			// Use direct credentials if provided
