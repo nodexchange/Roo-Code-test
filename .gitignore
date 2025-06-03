@@ -11,10 +11,6 @@ mock/
 # IDEs
 .idea
 
-# Builds
-bin/
-*.vsix
-
 # Local prompts and rules
 /local-prompts
 

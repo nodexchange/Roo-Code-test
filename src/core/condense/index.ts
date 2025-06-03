@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 
-import { TelemetryService } from "@roo-code/telemetry"
+// REMOVED: TelemetryService import for intranet security
+// import { TelemetryService } from "@roo-code/telemetry"
 
 import { t } from "../../i18n"
 import { ApiHandler } from "../../api"
@@ -90,12 +91,13 @@ export async function summarizeConversation(
 	customCondensingPrompt?: string,
 	condensingApiHandler?: ApiHandler,
 ): Promise<SummarizeResponse> {
-	TelemetryService.instance.captureContextCondensed(
-		taskId,
-		isAutomaticTrigger ?? false,
-		!!customCondensingPrompt?.trim(),
-		!!condensingApiHandler,
-	)
+	// REMOVED: Telemetry capture for intranet security
+	// TelemetryService.instance.captureContextCondensed(
+	// 	taskId,
+	// 	isAutomaticTrigger ?? false,
+	// 	!!customCondensingPrompt?.trim(),
+	// 	!!condensingApiHandler,
+	// )
 
 	const response: SummarizeResponse = { messages, cost: 0, summary: "" }
 	const messagesToSummarize = getMessagesSinceLastSummary(messages.slice(0, -N_MESSAGES_TO_KEEP))

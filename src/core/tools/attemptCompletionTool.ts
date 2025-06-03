@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 
-import { TelemetryService } from "@roo-code/telemetry"
+// REMOVED: TelemetryService import for intranet security
+// import { TelemetryService } from "@roo-code/telemetry"
 
 import { Task } from "../task/Task"
 import {
@@ -46,7 +47,8 @@ export async function attemptCompletionTool(
 					// we have command string, which means we have the result as well, so finish it (doesnt have to exist yet)
 					await cline.say("completion_result", removeClosingTag("result", result), undefined, false)
 
-					TelemetryService.instance.captureTaskCompleted(cline.taskId)
+					// REMOVED: Telemetry capture for intranet security
+					// TelemetryService.instance.captureTaskCompleted(cline.taskId)
 					cline.emit("taskCompleted", cline.taskId, cline.getTokenUsage(), cline.toolUsage)
 
 					await cline.ask("command", removeClosingTag("command", command), block.partial).catch(() => {})
@@ -72,7 +74,8 @@ export async function attemptCompletionTool(
 				if (lastMessage && lastMessage.ask !== "command") {
 					// Haven't sent a command message yet so first send completion_result then command.
 					await cline.say("completion_result", result, undefined, false)
-					TelemetryService.instance.captureTaskCompleted(cline.taskId)
+					// REMOVED: Telemetry capture for intranet security
+					// TelemetryService.instance.captureTaskCompleted(cline.taskId)
 					cline.emit("taskCompleted", cline.taskId, cline.getTokenUsage(), cline.toolUsage)
 				}
 
@@ -97,7 +100,8 @@ export async function attemptCompletionTool(
 				commandResult = execCommandResult
 			} else {
 				await cline.say("completion_result", result, undefined, false)
-				TelemetryService.instance.captureTaskCompleted(cline.taskId)
+				// REMOVED: Telemetry capture for intranet security
+				// TelemetryService.instance.captureTaskCompleted(cline.taskId)
 				cline.emit("taskCompleted", cline.taskId, cline.getTokenUsage(), cline.toolUsage)
 			}
 

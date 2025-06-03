@@ -15,7 +15,7 @@ import {
 	globalSettingsSchema,
 	isSecretStateKey,
 } from "@roo-code/types"
-import { TelemetryService } from "@roo-code/telemetry"
+// import { TelemetryService } from "@roo-code/telemetry"
 
 import { logger } from "../../utils/logging"
 
@@ -157,16 +157,7 @@ export class ContextProxy {
 
 	public getGlobalSettings(): GlobalSettings {
 		const values = this.getValues()
-
-		try {
-			return globalSettingsSchema.parse(values)
-		} catch (error) {
-			if (error instanceof ZodError) {
-				TelemetryService.instance.captureSchemaValidationError({ schemaName: "GlobalSettings", error })
-			}
-
-			return GLOBAL_SETTINGS_KEYS.reduce((acc, key) => ({ ...acc, [key]: values[key] }), {} as GlobalSettings)
-		}
+		return globalSettingsSchema.parse(values)
 	}
 
 	/**
@@ -175,16 +166,7 @@ export class ContextProxy {
 
 	public getProviderSettings(): ProviderSettings {
 		const values = this.getValues()
-
-		try {
-			return providerSettingsSchema.parse(values)
-		} catch (error) {
-			if (error instanceof ZodError) {
-				TelemetryService.instance.captureSchemaValidationError({ schemaName: "ProviderSettings", error })
-			}
-
-			return PROVIDER_SETTINGS_KEYS.reduce((acc, key) => ({ ...acc, [key]: values[key] }), {} as ProviderSettings)
-		}
+		return providerSettingsSchema.parse(values)
 	}
 
 	public async setProviderSettings(values: ProviderSettings) {
@@ -239,20 +221,12 @@ export class ContextProxy {
 	 */
 
 	public async export(): Promise<GlobalSettings | undefined> {
-		try {
-			const globalSettings = globalSettingsExportSchema.parse(this.getValues())
+		const globalSettings = globalSettingsExportSchema.parse(this.getValues())
 
-			// Exports should only contain global settings, so this skips project custom modes (those exist in the .roomode folder)
-			globalSettings.customModes = globalSettings.customModes?.filter((mode) => mode.source === "global")
+		// Exports should only contain global settings, so this skips project custom modes (those exist in the .roomode folder)
+		globalSettings.customModes = globalSettings.customModes?.filter((mode) => mode.source === "global")
 
-			return Object.fromEntries(Object.entries(globalSettings).filter(([_, value]) => value !== undefined))
-		} catch (error) {
-			if (error instanceof ZodError) {
-				TelemetryService.instance.captureSchemaValidationError({ schemaName: "GlobalSettings", error })
-			}
-
-			return undefined
-		}
+		return Object.fromEntries(Object.entries(globalSettings).filter(([_, value]) => value !== undefined))
 	}
 
 	/**
