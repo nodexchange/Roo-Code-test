@@ -172,25 +172,10 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			// Add the endpoint configuration when specified and enabled
 			...(this.options.awsBedrockEndpoint &&
 				this.options.awsBedrockEndpointEnabled && { endpoint: this.options.awsBedrockEndpoint }),
-			// ROBUST FIX: Force HTTP/1.1 to prevent HTTP/2 stream cancellation issues
-			// This is more reliable than trying to separate credential providers
-			requestHandler: {
-				connectionTimeout: 30000,
-				socketTimeout: 60000,
-				httpsAgent: {
-					maxSockets: 50,
-					timeout: 60000,
-					// Force HTTP/1.1 to avoid HTTP/2 stream issues
-					keepAlive: true,
-					keepAliveMsecs: 30000,
-					maxFreeSockets: 10,
-				},
-			},
 		}
 
 		if (this.options.awsUseProfile && this.options.awsProfile) {
 			// Use profile-based credentials if enabled and profile is set
-			// SIMPLIFIED: Use basic fromIni without complex clientConfig separation
 			clientConfig.credentials = fromIni({
 				profile: this.options.awsProfile,
 				ignoreCache: true,
@@ -216,23 +201,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		// Handle cross-region inference
 		const usePromptCache = Boolean(this.options.awsUsePromptCache && this.supportsAwsPromptCache(modelConfig))
 
-		// DEBUG: Log initial configuration
-		console.log("[Bedrock Debug] Starting createMessage with configuration:", {
-			modelId: modelConfig.id,
-			region: this.options.awsRegion,
-			useProfile: this.options.awsUseProfile,
-			profile: this.options.awsProfile,
-			customArn: this.options.awsCustomArn,
-			endpointEnabled: this.options.awsBedrockEndpointEnabled,
-			endpoint: this.options.awsBedrockEndpoint,
-			usePromptCache,
-			messageCount: messages.length,
-			systemPromptLength: systemPrompt?.length || 0,
-			hasAccessKey: !!this.options.awsAccessKey,
-			hasSecretKey: !!this.options.awsSecretKey,
-			hasSessionToken: !!this.options.awsSessionToken,
-		})
-
 		// Generate a conversation ID based on the first few messages to maintain cache consistency
 		const conversationId =
 			messages.length > 0
@@ -243,8 +211,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 					}`
 				: "default_conversation"
 
-		console.log("[Bedrock Debug] Generated conversation ID:", conversationId)
-
 		// Convert messages to Bedrock format, passing the model info and conversation ID
 		const formatted = this.convertToBedrockConverseMessages(
 			messages,
@@ -253,20 +219,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			modelConfig.info,
 			conversationId,
 		)
-
-		console.log("[Bedrock Debug] Message conversion completed:", {
-			systemMessageCount: formatted.system.length,
-			convertedMessageCount: formatted.messages.length,
-			formattedSystemPreview: formatted.system.slice(0, 2).map((s) => ({
-				type: "text",
-				preview: (s.text || "").substring(0, 100) + "...",
-			})),
-			formattedMessagesPreview: formatted.messages.slice(0, 3).map((m) => ({
-				role: m.role,
-				contentBlocks: m.content?.length || 0,
-				preview: m.content?.[0]?.text?.substring(0, 100) + "..." || "no text",
-			})),
-		})
 
 		// Construct the payload
 		const inferenceConfig: BedrockInferenceConfig = {
@@ -282,155 +234,34 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			inferenceConfig,
 		}
 
-		console.log("[Bedrock Debug] Final payload prepared:", {
-			modelId: payload.modelId,
-			messageCount: payload.messages.length,
-			systemCount: payload.system.length,
-			inferenceConfig: payload.inferenceConfig,
-			payloadSize: JSON.stringify(payload).length,
-		})
-
 		// Create AbortController with 10 minute timeout
 		const controller = new AbortController()
 		let timeoutId: NodeJS.Timeout | undefined
 
-		console.log("[Bedrock Debug] Created AbortController, starting stream request...")
-
-		const startTime = Date.now()
 		try {
 			timeoutId = setTimeout(
 				() => {
-					console.log("[Bedrock Debug] Request timeout reached (10 minutes), aborting...")
 					controller.abort()
 				},
 				10 * 60 * 1000,
 			)
 
 			const command = new ConverseStreamCommand(payload)
-			console.log("[Bedrock Debug] Created ConverseStreamCommand:", {
-				commandName: command.constructor.name,
-				input: {
-					modelId: command.input.modelId,
-					messageCount: command.input.messages?.length,
-					systemCount: command.input.system?.length,
-				},
-			})
-
-			// DEBUG: Log client configuration before sending
-			console.log("[Bedrock Debug] Client configuration:", {
-				region: (this.client?.config?.region as any) || "unknown",
-				endpoint: this.client.config.endpoint,
-				credentials: typeof this.client.config.credentials !== "undefined" ? "configured" : "not configured",
-				requestHandler: this.client.config.requestHandler ? "configured" : "default",
-			})
-
-			console.log("[Bedrock Debug] Sending request to AWS Bedrock...")
-
-			// Add a promise wrapper to track the request more granularly
-			let response: any
-			try {
-				console.log("[Bedrock Debug] About to call client.send() with AWS SDK...")
-
-				// Create a timeout promise to help debug hanging requests
-				const timeoutPromise = new Promise((_, reject) => {
-					setTimeout(() => {
-						reject(
-							new Error("DEBUG_TIMEOUT: Request took longer than 30 seconds - likely network/auth issue"),
-						)
-					}, 30000) // 30 second timeout for debugging
-				})
-
-				// Create the actual request promise
-				const requestPromise = this.client.send(command, {
-					abortSignal: controller.signal,
-				})
-
-				console.log("[Bedrock Debug] AWS SDK send() called, waiting for response...")
-
-				// Race between the request and timeout
-				response = await Promise.race([requestPromise, timeoutPromise])
-			} catch (raceError) {
-				// This will catch both AWS errors and our timeout
-				const responseTime = Date.now() - startTime
-				console.error("[Bedrock Debug] Request failed or timed out:", {
-					responseTime: `${responseTime}ms`,
-					error: raceError instanceof Error ? raceError.message : String(raceError),
-					errorType: raceError instanceof Error ? raceError.name : typeof raceError,
-					wasTimeout: raceError instanceof Error && raceError.message.includes("DEBUG_TIMEOUT"),
-				})
-
-				// If it's our debug timeout, try to get more info about the hanging request
-				if (raceError instanceof Error && raceError.message.includes("DEBUG_TIMEOUT")) {
-					console.error("[Bedrock Debug] Request is hanging - possible issues:", {
-						region: this.options.awsRegion,
-						customArn: this.options.awsCustomArn,
-						useProfile: this.options.awsUseProfile,
-						profile: this.options.awsProfile,
-						hasAccessKey: !!this.options.awsAccessKey,
-						hasSecretKey: !!this.options.awsSecretKey,
-						hasSessionToken: !!this.options.awsSessionToken,
-						endpointEnabled: this.options.awsBedrockEndpointEnabled,
-						endpoint: this.options.awsBedrockEndpoint,
-						possibleCauses: [
-							"Network connectivity blocked by corporate firewall/proxy",
-							"AWS credentials invalid or expired",
-							"Region not accessible from your network",
-							"Custom endpoint unreachable",
-							"HTTP/2 connection issues",
-						],
-					})
-				}
-
-				// Re-throw the original error
-				throw raceError
-			}
-
-			const responseTime = Date.now() - startTime
-			console.log("[Bedrock Debug] Received response from AWS Bedrock:", {
-				responseTime: `${responseTime}ms`,
-				hasStream: !!response.stream,
-				metadata: response.$metadata,
+			const response = await this.client.send(command, {
+				abortSignal: controller.signal,
 			})
 
 			if (!response.stream) {
 				clearTimeout(timeoutId)
-				console.error("[Bedrock Debug] No stream available in response!")
 				throw new Error("No stream available in the response")
 			}
 
-			console.log("[Bedrock Debug] Starting to process stream chunks...")
-			let chunkCount = 0
-			let totalTextReceived = 0
-			let usageEvents = 0
-
 			for await (const chunk of response.stream) {
-				chunkCount++
-				const chunkStartTime = Date.now()
-
-				console.log(`[Bedrock Debug] Processing chunk #${chunkCount}:`, {
-					chunkType: typeof chunk,
-					chunkKeys: chunk ? Object.keys(chunk) : [],
-					timestamp: new Date().toISOString(),
-				})
-
 				// Parse the chunk as JSON if it's a string (for tests)
 				let streamEvent: StreamEvent
 				try {
 					streamEvent = typeof chunk === "string" ? JSON.parse(chunk) : (chunk as unknown as StreamEvent)
-					console.log(`[Bedrock Debug] Parsed stream event #${chunkCount}:`, {
-						eventType: Object.keys(streamEvent)[0] || "unknown",
-						hasMetadata: !!streamEvent.metadata,
-						hasContentBlock: !!streamEvent.contentBlockStart || !!streamEvent.contentBlockDelta,
-						hasTrace: !!streamEvent.trace,
-						hasMessageStart: !!streamEvent.messageStart,
-						hasMessageStop: !!streamEvent.messageStop,
-					})
 				} catch (e) {
-					console.error(`[Bedrock Debug] Failed to parse chunk #${chunkCount}:`, {
-						error: e instanceof Error ? e.message : String(e),
-						chunkType: typeof chunk,
-						chunkPreview: typeof chunk === "string" ? (chunk as string).substring(0, 200) : "binary data",
-					})
 					logger.error("Failed to parse stream event", {
 						ctx: "bedrock",
 						error: e instanceof Error ? e : String(e),
@@ -441,19 +272,11 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 				// Handle metadata events first
 				if (streamEvent.metadata?.usage) {
-					usageEvents++
 					const usage = (streamEvent.metadata?.usage || {}) as UsageType
 
 					// Check both field naming conventions for cache tokens
 					const cacheReadTokens = usage.cacheReadInputTokens || usage.cacheReadInputTokenCount || 0
 					const cacheWriteTokens = usage.cacheWriteInputTokens || usage.cacheWriteInputTokenCount || 0
-
-					console.log(`[Bedrock Debug] Usage event #${usageEvents}:`, {
-						inputTokens: usage.inputTokens || 0,
-						outputTokens: usage.outputTokens || 0,
-						cacheReadTokens,
-						cacheWriteTokens,
-					})
 
 					// Always include all available token information
 					yield {
@@ -467,11 +290,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 				}
 
 				if (streamEvent?.trace?.promptRouter?.invokedModelId) {
-					console.log("[Bedrock Debug] Prompt router trace event:", {
-						invokedModelId: streamEvent.trace.promptRouter.invokedModelId,
-						hasUsage: !!streamEvent.trace.promptRouter.usage,
-					})
-
 					try {
 						//update the in-use model info to be based on the invoked Model Id for the router
 						//so that pricing, context window, caching etc have values that can be used
@@ -482,10 +300,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 						if (invokedModel) {
 							invokedModel.id = modelConfig.id
 							this.costModelConfig = invokedModel
-							console.log("[Bedrock Debug] Updated cost model config:", {
-								newModelId: invokedModel.id,
-								maxTokens: invokedModel.info.maxTokens,
-							})
 						}
 
 						// Handle metadata events for the promptRouter.
@@ -498,13 +312,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 							const cacheWriteTokens =
 								routerUsage.cacheWriteTokens || routerUsage.cacheWriteInputTokenCount || 0
 
-							console.log("[Bedrock Debug] Router usage event:", {
-								inputTokens: routerUsage.inputTokens || 0,
-								outputTokens: routerUsage.outputTokens || 0,
-								cacheReadTokens,
-								cacheWriteTokens,
-							})
-
 							yield {
 								type: "usage",
 								inputTokens: routerUsage.inputTokens || 0,
@@ -514,10 +321,6 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 							}
 						}
 					} catch (error) {
-						console.error("[Bedrock Debug] Error handling invokedModelId:", {
-							error: error instanceof Error ? error.message : String(error),
-							invokedModelId: streamEvent.trace.promptRouter.invokedModelId,
-						})
 						logger.error("Error handling Bedrock invokedModelId", {
 							ctx: "bedrock",
 							error: error instanceof Error ? error : String(error),
@@ -530,130 +333,36 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 
 				// Handle message start
 				if (streamEvent.messageStart) {
-					console.log("[Bedrock Debug] Message start event:", streamEvent.messageStart)
 					continue
 				}
 
 				// Handle content blocks
 				if (streamEvent.contentBlockStart?.start?.text) {
-					const text = streamEvent.contentBlockStart.start.text
-					totalTextReceived += text.length
-					console.log("[Bedrock Debug] Content block start:", {
-						textLength: text.length,
-						preview: text.substring(0, 100) + (text.length > 100 ? "..." : ""),
-						totalTextSoFar: totalTextReceived,
-					})
-
 					yield {
 						type: "text",
-						text: text,
+						text: streamEvent.contentBlockStart.start.text,
 					}
 					continue
 				}
 
 				// Handle content deltas
 				if (streamEvent.contentBlockDelta?.delta?.text) {
-					const text = streamEvent.contentBlockDelta.delta.text
-					totalTextReceived += text.length
-					console.log("[Bedrock Debug] Content block delta:", {
-						textLength: text.length,
-						preview: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
-						totalTextSoFar: totalTextReceived,
-					})
-
 					yield {
 						type: "text",
-						text: text,
+						text: streamEvent.contentBlockDelta.delta.text,
 					}
 					continue
 				}
 				// Handle message stop
 				if (streamEvent.messageStop) {
-					console.log("[Bedrock Debug] Message stop event:", {
-						stopReason: streamEvent.messageStop.stopReason,
-						additionalFields: streamEvent.messageStop.additionalModelResponseFields ? "present" : "none",
-					})
 					continue
 				}
-
-				// Log any unhandled stream events
-				console.log(`[Bedrock Debug] Unhandled stream event in chunk #${chunkCount}:`, {
-					eventKeys: Object.keys(streamEvent),
-					streamEvent: streamEvent,
-				})
-
-				const chunkProcessTime = Date.now() - chunkStartTime
-				console.log(`[Bedrock Debug] Chunk #${chunkCount} processed in ${chunkProcessTime}ms`)
 			}
-
 			// Clear timeout after stream completes
 			clearTimeout(timeoutId)
-			const totalTime = Date.now() - startTime
-			console.log("[Bedrock Debug] Stream completed successfully:", {
-				totalTime: `${totalTime}ms`,
-				totalChunks: chunkCount,
-				totalTextReceived,
-				usageEvents,
-			})
 		} catch (error: unknown) {
 			// Clear timeout on error
 			clearTimeout(timeoutId)
-			const totalTime = Date.now() - startTime
-
-			console.error("[Bedrock Debug] Stream failed with error:", {
-				totalTime: `${totalTime}ms`,
-				error: error instanceof Error ? error.message : String(error),
-				errorName: error instanceof Error ? error.name : undefined,
-				errorType: typeof error,
-				errorConstructor: error?.constructor?.name,
-			})
-
-			// Enhanced error logging for debugging at the source
-			console.error("[Bedrock createMessage] API call failed with detailed information:", {
-				error,
-				errorType: typeof error,
-				errorConstructor: error?.constructor?.name,
-				errorString: String(error),
-				errorMessage: error instanceof Error ? error.message : String(error),
-				errorName: error instanceof Error ? error.name : undefined,
-				errorStack: error instanceof Error ? error.stack : undefined,
-				// AWS SDK specific fields
-				awsErrorCode: (error as any)?.Code || (error as any)?.code,
-				awsErrorMessage: (error as any)?.Message || (error as any)?.message,
-				awsRequestId: (error as any)?.RequestId || (error as any)?.requestId,
-				awsStatusCode: (error as any)?.statusCode || (error as any)?.status,
-				awsMetadata: (error as any)?.$metadata,
-				awsResponse: (error as any)?.$response,
-				// Request context
-				modelId: payload.modelId,
-				region: this.options.awsRegion,
-				customArn: this.options.awsCustomArn,
-				useProfile: this.options.awsUseProfile,
-				profile: this.options.awsProfile,
-				hasAccessKey: !!this.options.awsAccessKey,
-				hasSecretKey: !!this.options.awsSecretKey,
-				hasSessionToken: !!this.options.awsSessionToken,
-				endpointEnabled: this.options.awsBedrockEndpointEnabled,
-				customEndpoint: this.options.awsBedrockEndpoint,
-				// Payload info (without sensitive data)
-				messageCount: payload.messages.length,
-				systemMessageCount: payload.system.length,
-				temperatureUsed: payload.inferenceConfig.temperature,
-				maxTokensUsed: payload.inferenceConfig.maxTokens,
-				// Client config info
-				clientRegion:
-					typeof this.client?.config?.region === "function"
-						? this.client.config.region()
-						: this.client.config.region,
-				// Full error serialization
-				fullError: (() => {
-					try {
-						return JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
-					} catch (e) {
-						return "Error serializing: " + String(e)
-					}
-				})(),
-			})
 
 			// Use the extracted error handling method for all errors
 			const errorChunks = this.handleBedrockError(error, true) // true for streaming context
