@@ -364,6 +364,53 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 			// Clear timeout on error
 			clearTimeout(timeoutId)
 
+			// Enhanced error logging for debugging at the source
+			console.error("[Bedrock createMessage] API call failed with detailed information:", {
+				error,
+				errorType: typeof error,
+				errorConstructor: error?.constructor?.name,
+				errorString: String(error),
+				errorMessage: error instanceof Error ? error.message : String(error),
+				errorName: error instanceof Error ? error.name : undefined,
+				errorStack: error instanceof Error ? error.stack : undefined,
+				// AWS SDK specific fields
+				awsErrorCode: (error as any)?.Code || (error as any)?.code,
+				awsErrorMessage: (error as any)?.Message || (error as any)?.message,
+				awsRequestId: (error as any)?.RequestId || (error as any)?.requestId,
+				awsStatusCode: (error as any)?.statusCode || (error as any)?.status,
+				awsMetadata: (error as any)?.$metadata,
+				awsResponse: (error as any)?.$response,
+				// Request context
+				modelId: payload.modelId,
+				region: this.options.awsRegion,
+				customArn: this.options.awsCustomArn,
+				useProfile: this.options.awsUseProfile,
+				profile: this.options.awsProfile,
+				hasAccessKey: !!this.options.awsAccessKey,
+				hasSecretKey: !!this.options.awsSecretKey,
+				hasSessionToken: !!this.options.awsSessionToken,
+				endpointEnabled: this.options.awsBedrockEndpointEnabled,
+				customEndpoint: this.options.awsBedrockEndpoint,
+				// Payload info (without sensitive data)
+				messageCount: payload.messages.length,
+				systemMessageCount: payload.system.length,
+				temperatureUsed: payload.inferenceConfig.temperature,
+				maxTokensUsed: payload.inferenceConfig.maxTokens,
+				// Client config info
+				clientRegion:
+					typeof this.client?.config?.region === "function"
+						? this.client.config.region()
+						: this.client.config.region,
+				// Full error serialization
+				fullError: (() => {
+					try {
+						return JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+					} catch (e) {
+						return "Error serializing: " + String(e)
+					}
+				})(),
+			})
+
 			// Use the extracted error handling method for all errors
 			const errorChunks = this.handleBedrockError(error, true) // true for streaming context
 			// Yield each chunk individually to ensure type compatibility
@@ -822,7 +869,7 @@ Suggestions:
 			logLevel: "error",
 		},
 		ON_DEMAND_NOT_SUPPORTED: {
-			patterns: ["with on-demand throughput isn’t supported."],
+			patterns: ["with on-demand throughput isn't supported."],
 			messageTemplate: `
 1. Try enabling cross-region inference in settings.
 2. Or, create an inference profile and then leverage the "Use custom ARN..." option of the model selector in settings.`,
@@ -946,6 +993,37 @@ Suggestions:
 		error: unknown,
 		isStreamContext: boolean,
 	): string | Array<{ type: string; text?: string; inputTokens?: number; outputTokens?: number }> {
+		// Enhanced error logging for debugging
+		console.error("[Bedrock Error Handler] Detailed error information:", {
+			error,
+			errorType: typeof error,
+			errorConstructor: error?.constructor?.name,
+			errorString: String(error),
+			errorMessage: error instanceof Error ? error.message : String(error),
+			errorName: error instanceof Error ? error.name : undefined,
+			errorStack: error instanceof Error ? error.stack : undefined,
+			// AWS SDK specific fields
+			awsErrorCode: (error as any)?.Code || (error as any)?.code,
+			awsErrorMessage: (error as any)?.Message || (error as any)?.message,
+			awsRequestId: (error as any)?.RequestId || (error as any)?.requestId,
+			awsStatusCode: (error as any)?.statusCode || (error as any)?.status,
+			awsMetadata: (error as any)?.$metadata,
+			awsResponse: (error as any)?.$response,
+			// Serialized error
+			fullError: (() => {
+				try {
+					return JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+				} catch (e) {
+					return "Error serializing: " + String(e)
+				}
+			})(),
+			// Context info
+			isStreamContext,
+			modelId: this.options?.apiModelId,
+			region: this.options?.awsRegion,
+			customArn: this.options?.awsCustomArn,
+		})
+
 		// Determine error type
 		const errorType = this.getErrorType(error)
 

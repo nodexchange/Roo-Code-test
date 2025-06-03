@@ -1705,20 +1705,62 @@ export class Task extends EventEmitter<ClineEvents> {
 			if (autoApprovalEnabled && alwaysApproveResubmit) {
 				let errorMsg
 
-				if (error.error?.metadata?.raw) {
-					errorMsg = JSON.stringify(error.error.metadata.raw, null, 2)
-				} else if (error.message) {
-					errorMsg = error.message
+				// Enhanced error handling for debugging - capture much more detail
+				if ((error as any).error?.metadata?.raw) {
+					errorMsg = JSON.stringify((error as any).error.metadata.raw, null, 2)
+				} else if ((error as any).message) {
+					errorMsg = (error as any).message
 				} else {
-					errorMsg = "Unknown error"
+					// Enhanced verbose error details for debugging
+					const errorDetails = {
+						errorType: typeof error,
+						errorConstructor: (error as any)?.constructor?.name,
+						errorString: String(error),
+						errorJSON: (() => {
+							try {
+								return JSON.stringify(error, null, 2)
+							} catch (e) {
+								return "Error serializing to JSON: " + String(e)
+							}
+						})(),
+						errorKeys: error && typeof error === "object" ? Object.keys(error) : [],
+						errorStack: (error as any)?.stack,
+						// AWS SDK specific error fields
+						awsErrorCode: (error as any)?.Code || (error as any)?.code,
+						awsErrorMessage: (error as any)?.Message || (error as any)?.message,
+						awsRequestId: (error as any)?.RequestId || (error as any)?.requestId,
+						awsStatusCode: (error as any)?.statusCode || (error as any)?.status,
+						awsMetadata: (error as any)?.$metadata,
+						awsResponse: (error as any)?.$response,
+						// Additional error properties
+						name: (error as any)?.name,
+						status: (error as any)?.status,
+						statusCode: (error as any)?.statusCode,
+						errorDetails: (error as any)?.errorDetails,
+						response: (error as any)?.response,
+						code: (error as any)?.code,
+						httpStatusCode: (error as any)?.$response?.statusCode,
+						requestId: (error as any)?.$response?.requestId,
+					}
+
+					errorMsg = `Unknown Error - Debug Info:\n${JSON.stringify(errorDetails, null, 2)}`
 				}
+
+				// Also log the detailed error for debugging
+				console.error("[RooCode API Request Error] Detailed error information:", {
+					error,
+					errorMessage: (error as any)?.message,
+					errorName: (error as any)?.name,
+					errorStack: (error as any)?.stack,
+					fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+				})
 
 				const baseDelay = requestDelaySeconds || 5
 				let exponentialDelay = Math.ceil(baseDelay * Math.pow(2, retryAttempt))
 
 				// If the error is a 429, and the error details contain a retry delay, use that delay instead of exponential backoff
-				if (error.status === 429) {
-					const geminiRetryDetails = error.errorDetails?.find(
+				if ((error as any).status === 429) {
+					const geminiRetryDetails = (error as any).errorDetails?.find(
 						(detail: any) => detail["@type"] === "type.googleapis.com/google.rpc.RetryInfo",
 					)
 					if (geminiRetryDetails) {
@@ -1756,9 +1798,49 @@ export class Task extends EventEmitter<ClineEvents> {
 
 				return
 			} else {
+				// Enhanced error handling for debugging in the else block too
+				let errorMsg
+				if ((error as any).message) {
+					errorMsg = (error as any).message
+				} else {
+					// Enhanced verbose error details for debugging
+					const errorDetails = {
+						errorType: typeof error,
+						errorConstructor: (error as any)?.constructor?.name,
+						errorString: String(error),
+						errorJSON: (() => {
+							try {
+								return JSON.stringify(error, null, 2)
+							} catch (e) {
+								return "Error serializing to JSON: " + String(e)
+							}
+						})(),
+						errorKeys: error && typeof error === "object" ? Object.keys(error) : [],
+						errorStack: (error as any)?.stack,
+						// AWS SDK specific error fields
+						awsErrorCode: (error as any)?.Code || (error as any)?.code,
+						awsErrorMessage: (error as any)?.Message || (error as any)?.message,
+						awsRequestId: (error as any)?.RequestId || (error as any)?.requestId,
+						awsStatusCode: (error as any)?.statusCode || (error as any)?.status,
+						awsMetadata: (error as any)?.$metadata,
+						awsResponse: (error as any)?.$response,
+					}
+
+					errorMsg = `Unknown Error - Debug Info:\n${JSON.stringify(errorDetails, null, 2)}`
+				}
+
+				// Also log the detailed error for debugging
+				console.error("[RooCode API Request Error] Detailed error information:", {
+					error,
+					errorMessage: (error as any)?.message,
+					errorName: (error as any)?.name,
+					errorStack: (error as any)?.stack,
+					fullError: JSON.stringify(error, Object.getOwnPropertyNames(error), 2),
+				})
+
 				const { response } = await this.ask(
 					"api_req_failed",
-					error.message ?? JSON.stringify(serializeError(error), null, 2),
+					errorMsg ?? JSON.stringify(serializeError(error), null, 2),
 				)
 
 				if (response !== "yesButtonClicked") {
