@@ -93,37 +93,10 @@ type OpenRouterModelEndpointsResponse = z.infer<typeof openRouterModelEndpointsR
  * getOpenRouterModels
  */
 
-export async function getOpenRouterModels(options?: ApiHandlerOptions): Promise<Record<string, ModelInfo>> {
-	const models: Record<string, ModelInfo> = {}
-	const baseURL = options?.openRouterBaseUrl || "https://openrouter.ai/api/v1"
-
-	try {
-		const response = await axios.get<OpenRouterModelsResponse>(`${baseURL}/models`)
-		const result = openRouterModelsResponseSchema.safeParse(response.data)
-		const data = result.success ? result.data.data : response.data.data
-
-		if (!result.success) {
-			console.error("OpenRouter models response is invalid", result.error.format())
-		}
-
-		for (const model of data) {
-			const { id, architecture, top_provider, supported_parameters = [] } = model
-
-			models[id] = parseOpenRouterModel({
-				id,
-				model,
-				modality: architecture?.modality,
-				maxTokens: top_provider?.max_completion_tokens,
-				supportedParameters: supported_parameters,
-			})
-		}
-	} catch (error) {
-		console.error(
-			`Error fetching OpenRouter models: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`,
-		)
-	}
-
-	return models
+export async function getOpenRouterModels(): Promise<Record<string, ModelInfo>> {
+	// REMOVED: External API call for intranet security - return empty models instead
+	console.log("[OpenRouter] External model fetching disabled for intranet deployment")
+	return {} // Return empty models for intranet security
 }
 
 /**
