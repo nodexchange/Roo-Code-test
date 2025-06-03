@@ -1,6 +1,7 @@
 import * as vscode from "vscode"
 
-import { CloudService } from "@roo-code/cloud"
+// REMOVED: CloudService import for intranet security
+// import { CloudService } from "@roo-code/cloud"
 
 import { ClineProvider } from "../core/webview/ClineProvider"
 
@@ -36,9 +37,10 @@ export const handleUri = async (uri: vscode.Uri) => {
 			break
 		}
 		case "/auth/clerk/callback": {
-			const code = query.get("code")
-			const state = query.get("state")
-			await CloudService.instance.handleAuthCallback(code, state)
+			// REMOVED: CloudService callback for intranet security
+			// const code = query.get("code")
+			// const state = query.get("state")
+			// await CloudService.instance.handleAuthCallback(code, state)
 			break
 		}
 		default:

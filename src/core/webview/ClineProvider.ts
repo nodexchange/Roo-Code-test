@@ -28,7 +28,8 @@ import {
 	glamaDefaultModelId,
 	ORGANIZATION_ALLOW_ALL,
 } from "@roo-code/types"
-import { CloudService } from "@roo-code/cloud"
+// REMOVED: CloudService import for intranet security
+// import { CloudService } from "@roo-code/cloud"
 
 import { t } from "../../i18n"
 import { setPanel } from "../../activate/registerCommands"
@@ -1424,23 +1425,25 @@ export class ClineProvider
 
 		let organizationAllowList = ORGANIZATION_ALLOW_ALL
 
-		try {
-			organizationAllowList = await CloudService.instance.getAllowList()
-		} catch (error) {
-			console.error(
-				`[getState] failed to get organization allow list: ${error instanceof Error ? error.message : String(error)}`,
-			)
-		}
+		// REMOVED: CloudService capture for intranet security
+		// try {
+		// 	organizationAllowList = await CloudService.instance.getAllowList()
+		// } catch (error) {
+		// 	console.error(
+		// 		`[getState] failed to get organization allow list: ${error instanceof Error ? error.message : String(error)}`,
+		// 	)
+		// }
 
 		let cloudUserInfo: CloudUserInfo | null = null
 
-		try {
-			cloudUserInfo = CloudService.instance.getUserInfo()
-		} catch (error) {
-			console.error(
-				`[getState] failed to get cloud user info: ${error instanceof Error ? error.message : String(error)}`,
-			)
-		}
+		// REMOVED: CloudService capture for intranet security
+		// try {
+		// 	cloudUserInfo = CloudService.instance.getUserInfo()
+		// } catch (error) {
+		// 	console.error(
+		// 		`[getState] failed to get cloud user info: ${error instanceof Error ? error.message : String(error)}`,
+		// 	)
+		// }
 
 		// Return the same structure as before
 		return {

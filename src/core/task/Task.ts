@@ -21,7 +21,7 @@ import {
 	type HistoryItem,
 	TelemetryEventName,
 } from "@roo-code/types"
-import { CloudService } from "@roo-code/cloud"
+// import { CloudService } from "@roo-code/cloud"
 
 // api
 import { ApiHandler, ApiHandlerCreateMessageMetadata, buildApiHandler } from "../../api"
@@ -326,14 +326,14 @@ export class Task extends EventEmitter<ClineEvents> {
 		this.emit("message", { action: "created", message })
 		await this.saveClineMessages()
 
-		const shouldCaptureMessage = message.partial !== true && CloudService.isEnabled()
-
-		if (shouldCaptureMessage) {
-			CloudService.instance.captureEvent({
-				event: TelemetryEventName.TASK_MESSAGE,
-				properties: { taskId: this.taskId, message },
-			})
-		}
+		// REMOVED: CloudService capture for intranet security
+		// const shouldCaptureMessage = message.partial !== true && CloudService.isEnabled()
+		// if (shouldCaptureMessage) {
+		// 	CloudService.instance.captureEvent({
+		// 		event: TelemetryEventName.TASK_MESSAGE,
+		// 		properties: { taskId: this.taskId, message },
+		// 	})
+		// }
 	}
 
 	public async overwriteClineMessages(newMessages: ClineMessage[]) {
@@ -346,14 +346,14 @@ export class Task extends EventEmitter<ClineEvents> {
 		await provider?.postMessageToWebview({ type: "partialMessage", partialMessage })
 		this.emit("message", { action: "updated", message: partialMessage })
 
-		const shouldCaptureMessage = partialMessage.partial !== true && CloudService.isEnabled()
-
-		if (shouldCaptureMessage) {
-			CloudService.instance.captureEvent({
-				event: TelemetryEventName.TASK_MESSAGE,
-				properties: { taskId: this.taskId, message: partialMessage },
-			})
-		}
+		// REMOVED: CloudService capture for intranet security
+		// const shouldCaptureMessage = partialMessage.partial !== true && CloudService.isEnabled()
+		// if (shouldCaptureMessage) {
+		// 	CloudService.instance.captureEvent({
+		// 		event: TelemetryEventName.TASK_MESSAGE,
+		// 		properties: { taskId: this.taskId, message: partialMessage },
+		// 	})
+		// }
 	}
 
 	private async saveClineMessages() {
